@@ -3,8 +3,6 @@
 from __future__ import print_function
 import fitz # <--- PyMuPDF
 
-import struct
-
 """
 Created on Mon Apr 05 07:00:00 2016
 
@@ -27,6 +25,7 @@ PyMuPDF, json, sqlite3
 class pdfParserTable(object):
     def __init__(self, document):
         self.document = fitz.Document( document )
+        self.pageCount = self.document.pageCount
 
     # ==============================================================================
     # Function ParseTab - parse a document table into a Python list of lists
@@ -153,7 +152,7 @@ class pdfParserTable(object):
         spantab.append(zeile)
         return spantab
 
-    def extactDocument(self, page_number, table_title, table_end):
+    def extactDocument(self, page_number=0, table_title='', table_end=''):
         # ==============================================================================
         # Main program
         # ==============================================================================
@@ -171,30 +170,40 @@ class pdfParserTable(object):
         # search for top of table
         # ==============================================================================
         # table_title = string identifying table top
-        search1 = page.searchFor(table_title, hit_max=1)
-        if not search1:
-            raise ValueError("table top delimiter not found")
-        rect1 = search1[0]  # the rectangle that surrounds the search string
-        ymin = rect1.y1  # table starts below this value
+        if not table_title:
+            ymin = 0
+        else:
+            search1 = page.searchFor(table_title, hit_max=1)
+            if not search1:
+                raise ValueError("table top delimiter not found")
+            rect1 = search1[0]  # the rectangle that surrounds the search string
+            ymin = rect1.y1  # table starts below this value
 
         # ==============================================================================
         # search for bottom of table
         # ==============================================================================
-        search2 = page.searchFor(table_end, hit_max=1)
-        if not search2:
-            print("warning: table bottom delimiter not found - using end of page")
+        if not table_end:
             ymax = 99999
         else:
-            rect2 = search2[0]  # the rectangle that surrounds the search string
-            ymax = rect2.y0  # table ends above this value
+            search2 = page.searchFor(table_end, hit_max=1)
+            if not search2:
+                print("warning: table bottom delimiter not found - using end of page")
+                ymax = 99999
+            else:
+                rect2 = search2[0]  # the rectangle that surrounds the search string
+                ymax = rect2.y0  # table ends above this value
 
         if not ymin < ymax:  # something was wrong with the search strings
             raise ValueError("table bottom delimiter greater than top")
 
+        return self.parseRectangle(page.number, ymin, ymax)
+
+    def parseRectangle(self, page_number, ymin=0, ymax=9999):
+
         # ==============================================================================
         # now get the table and do something meaningfull with it
         # ==============================================================================
-        tab = self.ParseTab(page.number, [0, ymin, 9999, ymax])
+        tab = self.ParseTab(page_number, [0, ymin, 9999, ymax])
         resp = []
         # print(table_title)
         # for t in tab:
@@ -202,27 +211,17 @@ class pdfParserTable(object):
         # csv = open("p%s.csv" % (pno+1,), "w")
         # csv.write(table_title + "\n")
         for t in tab:
-            print(t)
+            #print(t)
             resp.append(t)
             # csv.write("|".join(t).encode("utf-8","ignore") + "\n")
         # csv.close()
         return resp
 
-
-pt = pdfParserTable('/home/javier/proyectos/finanzas/hsbc_resumenes/docs/resumen_feb_2019.pdf')
-tabla1 = pt.extactDocument(0, "EXTRACTO", "CUENTA CORRIENTE EN $ NRO.")
-tabla2 = pt.extactDocument(0, "CUENTA CORRIENTE EN $ NRO", "nada")
-fieldwidths = (9, -2, 50-11, 65-51, 74-66, 94-75, -10, 10)  # negative widths represent ignored padding fields
-fmtstring = ' '.join('{}{}'.format(abs(fw), 'x' if fw < 0 else 's') for fw in fieldwidths)
-lenfmt = sum([abs(x) for x in fieldwidths])
-fieldstruct = struct.Struct(fmtstring)
-parse = fieldstruct.unpack_from
-print('fmtstring: {!r}, recsize: {} chars'.format(fmtstring, fieldstruct.size))
-
-i = [ x[0] for x in tabla2 ]
-for line in i:
-    #print(line)
-    if len(line) < lenfmt:
-        line += ' ' * (lenfmt - len(line))
-    fields = parse(line.encode())
-    print('fields: {}'.format(fields))
+    def searchInAllPages(self, searchStr, pagInicio=0):
+        """ Searchs for a string in all the pages and returns the page number
+            (beggining with 0) and the position of the first occurrence where the text was found"""
+        for page_number in range(pagInicio, self.pageCount):
+            page = self.document.loadPage(page_number)  # read this page
+            res = page.searchFor(searchStr, hit_max=1)
+            if res:
+                return page_number
