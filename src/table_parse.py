@@ -225,3 +225,9 @@ class pdfParserTable(object):
             res = page.searchFor(searchStr, hit_max=1)
             if res:
                 return page_number
+
+    def searchTextLine(self, textToSearch, pageNum=0):
+        '''Search for a text and return the whole line that contain that text'''
+        page = self.document.loadPage(pageNum)
+        rec = page.searchFor(textToSearch, hit_max=1)
+        return self.parseRectangle(0, rec[0][1], rec[0][3])
