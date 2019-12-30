@@ -170,14 +170,21 @@ class pdfParserTable(object):
         # search for top of table
         # ==============================================================================
         # table_title = string identifying table top
+        # modified to search for the first one (min y) in case of multiple findings
         if not table_title:
             ymin = 0
         else:
-            search1 = page.searchFor(table_title, hit_max=1)
+            search1 = page.searchFor(table_title) #, hit_max=1)
             if not search1:
                 raise ValueError("table top delimiter not found")
             rect1 = search1[0]  # the rectangle that surrounds the search string
             ymin = rect1.y1  # table starts below this value
+            if len(search1) > 1:
+                for r in search1[1:]:
+                    if ymin > r.y1:
+                        rect1 = r  # the rectangle that surrounds the search string
+                        ymin = r.y1
+
 
         # ==============================================================================
         # search for bottom of table
