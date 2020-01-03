@@ -113,30 +113,29 @@ def get_accounts_with_transactions(fileName):
                  u'CUENTA SUELDO EN $ NRO': '- DETALLE DE INTERESES -'}
 
     #cantcuentas = len(cuentas)
-    encabezados = [cuentas[x]['encabezado'] for x in cuentas]
+    #encabezados = [cuentas[x]['encabezado'] for x in cuentas]
     for cuenta in cuentas:
         fecDefault = get_default_date(pt)
-        content = []
         encabezado = cuentas[cuenta]['encabezado']
         pag_inicio = pt.searchInAllPages(encabezado)
-        pag_fin = pt.searchInAllPages(fin_tabla[encabezado], pag_inicio)
+        pag_fin = pt.searchInAllPages(fin_tabla[encabezado], pag_inicio['pag'], pag_inicio['y'])
         pag_next = 0
         if pag_fin is None or pag_inicio is None:
             cuentas[cuenta]['transacciones'] = []
             continue
         try:
-            tabla = pt.extactDocument(pag_inicio, encabezado, fin_tabla[encabezado])
+            tabla = pt.extactDocument(pag_inicio['pag'], encabezado, fin_tabla[encabezado])
         except ValueError:
-            tabla = pt.extactDocument(pag_inicio, encabezado)
+            tabla = pt.extactDocument(pag_inicio['pag'], encabezado)
         #print(tabla)
         content = extract_hsbc_table(tabla, fecDefault)
-        if (pag_fin - pag_inicio) > 1:
-            pag_next = pag_inicio + 1
-            for page in range(pag_next, pag_fin):
+        if (pag_fin['pag'] - pag_inicio['pag']) > 1:
+            pag_next = pag_inicio['pag'] + 1
+            for page in range(pag_next, pag_fin['pag']):
                 tabla = pt.parseRectangle(page)
                 #print(tabla)
                 content = extract_hsbc_table(tabla, fecDefault, content)
-        tabla = pt.extactDocument(pag_fin, '', fin_tabla[encabezado])
+        tabla = pt.extactDocument(pag_fin['pag'], '', fin_tabla[encabezado])
         #print(tabla)
         content = extract_hsbc_table(tabla, fecDefault, content)
         cuentas[cuenta]['transacciones'] = content
@@ -149,3 +148,4 @@ if __name__ == '__main__':
         print(f)
         allItems = get_accounts_with_transactions(f)
         pprint.pprint(allItems)
+        

@@ -224,14 +224,21 @@ class pdfParserTable(object):
         # csv.close()
         return resp
 
-    def searchInAllPages(self, searchStr, pagInicio=0):
+    def searchInAllPages(self, searchStr, pagInicio=0, yInicio=None):
         """ Searchs for a string in all the pages and returns the page number
             (beggining with 0) and the position of the first occurrence where the text was found"""
         for page_number in range(pagInicio, self.pageCount):
             page = self.document.loadPage(page_number)  # read this page
             res = page.searchFor(searchStr, hit_max=1)
             if res:
-                return page_number
+                if not yInicio:
+                    return {'pag':page_number, 'y':res[0][3]}
+                else:
+                    if page_number > pagInicio:
+                        return {'pag': page_number, 'y': res[0][3]}
+                    else:
+                        if res[0][3] > yInicio:
+                            return {'pag': page_number, 'y': res[0][3]}
 
     def searchTextLine(self, textToSearch, pageNum=0):
         '''Search for a text and return the whole line that contain that text'''
