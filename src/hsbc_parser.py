@@ -10,7 +10,9 @@ import glob
 
 meses = { 'ENE': 1, 'FEB': 2, 'MAR': 3, 'ABR': 4, 'MAY': 5, 'JUN': 6, 'JUL': 7, 'AGO': 8, 'SEP': 9, 'OCT': 10, 'NOV': 11, 'DIC': 12 }
 
-def parsear_fecha(txtFecha, fecDefault):
+def parse_date(txtFecha, fecDefault):
+    ''' Parsea un texto conteniendo dia y mes y devuelve una fecha con ese dia, y mes y el año de la fecha default
+        o fecha por default (si el string esta vacio)'''
     if txtFecha:
         lfecha = txtFecha.split('-')
         #print(lfecha)
@@ -61,7 +63,7 @@ def extract_hsbc_table(tabla, fecDefault, content=None):
             if all( [ not val for val in fields ] ):
                 continue
             if fields[1].startswith('-') or not content:
-                fecDefault = parsear_fecha(fields[0], fecDefault)
+                fecDefault = parse_date(fields[0], fecDefault)
                 fields[0] = fecDefault
                 fields[1] = fields[1].replace('-','',1).strip()
                 fields[3] = convert_float(fields[3])
