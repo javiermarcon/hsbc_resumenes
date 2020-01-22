@@ -5,10 +5,25 @@ from table_parse import pdfParserTable
 import struct
 import datetime
 import re
-import pprint
+import os
 import glob
+import csv
 
 meses = { 'ENE': 1, 'FEB': 2, 'MAR': 3, 'ABR': 4, 'MAY': 5, 'JUN': 6, 'JUL': 7, 'AGO': 8, 'SEP': 9, 'OCT': 10, 'NOV': 11, 'DIC': 12 }
+
+monedas = {'$': 'ARS', 'u$s': 'USD'}
+
+fin_tabla = {u'CUENTA CORRIENTE EN $ NRO': ['- RESUMEN DE ACUERDOS - (*)'],
+                 u'CAJA DE AHORRO EN u$s NRO': ['- SALDO FINAL', '- DETALLE DE INTERESES -'],
+                 u'CUENTA SUELDO EN $ NRO': ['- SALDO FINAL', '- DETALLE DE INTERESES -']}
+
+from categories_and_tags import tagsRegexps
+
+def get_cat_and_tag(trans):
+    res = [val for key, val in tagsRegexps.items() if key in trans[1] and key]
+    if res:
+        return res[0]
+    return ('', '')
 
 def parse_date(txtFecha, fecDefault):
     ''' Parsea un texto conteniendo dia y mes y devuelve una fecha con ese dia, y mes y el año de la fecha default
@@ -37,6 +52,8 @@ def extract_hsbc_table(tabla, fecDefault, content=None):
                    u'7510224-7', u'7510224-0']
     stop_iteration = [u'_____________________________________________________________________________________________________________',
                       'NO HUBO NINGUNA ACTIVIDAD DURANTE EL PERIODO DEL EXTRACTO']
+    skip_starts = ['HOJA', 'EXTRACTO DE']
+    #print(tabla)
     if len(tabla) > 0 and len(tabla[0]) > 1:
         dummy_content = tabla[0][1].strip()
         if dummy_content in stop_iteration:
@@ -52,7 +69,8 @@ def extract_hsbc_table(tabla, fecDefault, content=None):
     for line in i:
         # print(line)
         stline = line.strip()
-        if not stline or stline in omitir_txts or stline.startswith('HOJA') or stline in stop_iteration:
+        startSkip = any([ stline.startswith(x) for x in skip_starts])
+        if not stline or stline in omitir_txts or startSkip or stline in stop_iteration:
             continue
         if len(line) < lenfmt:
             line += ' ' * (lenfmt - len(line))
@@ -81,7 +99,7 @@ def extract_hsbc_table(tabla, fecDefault, content=None):
 
 def get_cuentas(pt):
     '''Extrae la info de las cuentas de un pdf'''
-    detalle_cuentas = {}
+    detalle_cuentas = []
     encabezado = pt.extactDocument(0, "EXTRACTO", "CUENTA CORRIENTE EN $ NRO.")
     omitir = [u' PRODUCTO', u'SUC', u'CUENTA', u'CBU', u'SALDO ANTERIOR', u'SALDO ACTUAL']
     cuentas = [re.split(r'\s{2,}', x[0]) for x in encabezado if re.split(r'\s{2,}', x[0]) != omitir]
@@ -95,8 +113,34 @@ def get_cuentas(pt):
         cta_data['cbu'] = cuenta[3]
         cta_data['saldoant'] = cuenta[4]
         cta_data['saldoact'] = cuenta[5]
-        detalle_cuentas[cta_data['nombre']] = cta_data
+        detalle_cuentas.append(cta_data)
+
     return detalle_cuentas
+
+def get_pag_inicio_fin( pt, accounts):
+    """
+
+    :rtype: object
+    """
+    ret = []
+    for account in accounts:
+        account['pag_inicio'] = pt.searchInAllPages(account['encabezado'])
+        account['pag_fin'] = None
+        for texto_buscar in fin_tabla[account['encabezado']]:
+            account['pag_fin'] = pt.searchInAllPages(texto_buscar, account['pag_inicio']['pag'], account['pag_inicio']['y'])
+            if account['pag_fin']:
+                break
+        ret.append(account)
+
+    reversed_pags = reversed(list(enumerate(ret)))
+    for nro, pag in reversed_pags:
+        if nro:
+            pag_ant = ret[nro - 1]['pag_inicio']
+            if pag_ant:
+                pf = ret[nro]['pag_fin']
+                if not pf or pag_ant['pag'] < pf['pag'] or (pag_ant['pag'] == pf['pag'] and pag_ant['y'] < pf['y']):
+                    pf = pag_ant
+    return ret
 
 def get_default_date(pt):
     '''Extrae el año del resumen'''
@@ -108,25 +152,22 @@ def get_accounts_with_transactions(fileName):
     '''Obtiene las cuentas y transacciones de un archivo'''
     pt = pdfParserTable(fileName)
 
-    cuentas = get_cuentas(pt)
+    cuentas = get_pag_inicio_fin(pt, get_cuentas(pt))
 
-    fin_tabla = {u'CUENTA CORRIENTE EN $ NRO': '- RESUMEN DE ACUERDOS - (*)',
-                 u'CAJA DE AHORRO EN u$s NRO': '- DETALLE DE INTERESES -',
-                 u'CUENTA SUELDO EN $ NRO': '- DETALLE DE INTERESES -'}
 
     #cantcuentas = len(cuentas)
     #encabezados = [cuentas[x]['encabezado'] for x in cuentas]
     for cuenta in cuentas:
         fecDefault = get_default_date(pt)
-        encabezado = cuentas[cuenta]['encabezado']
-        pag_inicio = pt.searchInAllPages(encabezado)
-        pag_fin = pt.searchInAllPages(fin_tabla[encabezado], pag_inicio['pag'], pag_inicio['y'])
+        encabezado = cuenta['encabezado']
         pag_next = 0
+        pag_inicio = cuenta['pag_inicio']
+        pag_fin = cuenta['pag_fin']
         if pag_fin is None or pag_inicio is None:
-            cuentas[cuenta]['transacciones'] = []
+            cuenta['transacciones'] = []
             continue
         try:
-            tabla = pt.extactDocument(pag_inicio['pag'], encabezado, fin_tabla[encabezado])
+            tabla = pt.extactDocument(pag_inicio['pag'], encabezado, fin_tabla[encabezado][0])
         except ValueError:
             tabla = pt.extactDocument(pag_inicio['pag'], encabezado)
         #print(tabla)
@@ -137,17 +178,60 @@ def get_accounts_with_transactions(fileName):
                 tabla = pt.parseRectangle(page)
                 #print(tabla)
                 content = extract_hsbc_table(tabla, fecDefault, content)
-        tabla = pt.extactDocument(pag_fin['pag'], '', fin_tabla[encabezado])
+        tabla = pt.extactDocument(pag_fin['pag'], '', fin_tabla[encabezado][0])
         #print(tabla)
         content = extract_hsbc_table(tabla, fecDefault, content)
-        cuentas[cuenta]['transacciones'] = content
+        cuenta['transacciones'] = content
     return cuentas
 
-if __name__ == '__main__':
-    for f in glob.glob(
-            '/home/javier/Documentos/economia/bancos/hsbc/resumenes/resumen_nov_2019.pdf'):
-        #    '/home/javier/Documentos/economia/bancos/hsbc/resumenes/resumen*.pdf'):
-        print(f)
+def get_transactions(location='/home/javier/Documentos/economia/bancos/hsbc/resumenes', pattern='resumen*.pdf'):
+    '''Gets the transactions'''
+    transactions = {}
+    for f in glob.glob(os.path.join(location, pattern)):
+        #print(f)
         allItems = get_accounts_with_transactions(f)
-        pprint.pprint(allItems)
+        # pprint.pprint(allItems)
+        for item in allItems:
+            nomcta = '{encabezado} {numero}'.format(**item)
+            moneda = monedas[item['moneda']]
+            cta_ing = '{}_ingresos'.format(nomcta)
+            cta_gas = '{}_gastos'.format(nomcta)
+            if cta_ing not in transactions:
+                transactions[cta_ing] = []
+                transactions[cta_gas] = []
+            for trans in item['transacciones']:
+                if trans[3] == 0.0 and trans[4] == 0.0:
+                    continue # no hay movimiento
+                else:
+                    if trans[4] == 0.0:
+                        # gasto
+                        importe = trans[3]
+                        cta = cta_gas
+                    else:
+                        # ingreso
+                        importe = trans[4]
+                        cta = cta_ing
+                    tag, categoria = get_cat_and_tag(trans)
+                    #                              fecha     descr    moneda    nro      importe  categoria, tag
+                    transactions[cta].append([trans[0], trans[1], moneda, trans[2], importe, categoria, tag])
+
+    for cta in transactions:
+        lc = len(transactions[cta])
+        if not lc:
+            print('No hay transacciones para {}'.format(cta))
+            continue
+        print('Generando csv de {} transacciones para {}'.format(lc, cta))
+        with open('/tmp/{}.csv'.format(cta), 'a') as outcsv:
+            # configure writer to write standard csv file
+            writer = csv.writer(outcsv, delimiter=',', lineterminator='\n') # quotechar='|', quoting=csv.QUOTE_MINIMAL,
+            writer.writerow(["fecha", "desc", 'moneda', "nro", "importe", 'categoria', 'tag'])
+            for item in transactions[cta]:
+                # Write item to outcsv
+                writer.writerow(item)
+
+    return transactions
+
+if __name__ == '__main__':
+    get_transactions()
+
         
