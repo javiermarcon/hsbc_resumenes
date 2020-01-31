@@ -132,14 +132,15 @@ def get_pag_inicio_fin( pt, accounts):
                 break
         ret.append(account)
 
+    pag_ant = None
     reversed_pags = reversed(list(enumerate(ret)))
     for nro, pag in reversed_pags:
+        if pag_ant:
+            pf = ret[nro]['pag_fin']
+            if not pf or pag_ant['pag'] < pf['pag'] or (pag_ant['pag'] == pf['pag'] and pag_ant['y'] < pf['y']):
+                ret[nro]['pag_fin'] = pag_ant
         if nro:
-            pag_ant = ret[nro - 1]['pag_inicio']
-            if pag_ant:
-                pf = ret[nro]['pag_fin']
-                if not pf or pag_ant['pag'] < pf['pag'] or (pag_ant['pag'] == pf['pag'] and pag_ant['y'] < pf['y']):
-                    pf = pag_ant
+            pag_ant = ret[nro]['pag_inicio']
     return ret
 
 def get_default_date(pt):
