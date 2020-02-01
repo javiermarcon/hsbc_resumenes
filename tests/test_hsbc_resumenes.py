@@ -14,20 +14,20 @@ class TableParserTest(unittest.TestCase):
                                            'encabezado': 'CUENTA CORRIENTE EN $ NRO',
                                            'numero': '1001-12345-0',
                                            'cbu': '15000541 00010011234500',
-                                           'saldoant': '121.26', 'saldoact': '121.26'},
+                                           'saldoant': '543.21', 'saldoact': '321.56'},
                    {'nombre': ' CAJA DE AHORRO u$s',
                                            'moneda': 'u$s',
                                            'encabezado': 'CAJA DE AHORRO EN u$s NRO',
-                                           'numero': '100-2-23456-6',
-                                           'cbu': '15000541 00010022345664',
-                                           'saldoant': '1,032.33', 'saldoact': '980.98'},
+                                           'numero': '100-2-23456-1',
+                                           'cbu': '15000541 00010022345614',
+                                           'saldoant': '3,072.33', 'saldoact': '1,489.98'},
                    {'nombre': ' CUENTA SUELDO $',
                                         'moneda': '$',
                                         'encabezado': 'CUENTA SUELDO EN $ NRO',
-                                        'numero': '100-3-54321-8',
-                                        'cbu': '15000541 000100354321182',
-                                        'saldoant': '27,958.90',
-                                        'saldoact': '50,750.33'}]
+                                        'numero': '100-3-34567-2',
+                                        'cbu': '15000541 00010033456722',
+                                        'saldoant': '17,988.90',
+                                        'saldoact': '30,770.33'}]
 
     def test_months(self):
         ''' ests that moths var has 12 months '''
@@ -62,6 +62,21 @@ class TableParserTest(unittest.TestCase):
                                    ('1,645,833.14-', -1645833.14), ('asado', 0.0), ('', 0.0)]
         for data in parameters_and_expected:
             self.assertEqual(convert_float(data[0]), data[1])
+
+    @mock.patch('src.table_parse.fitz')
+    @mock.patch('src.hsbc_parser.pdfParserTable.extactDocument')
+    def test_get_accounts(self, mock_extract_document, mock_fizz):
+        '''Tests that the get_cuentas methods returns the account information'''
+        mock_extract_document.return_value = [[' PRODUCTO               SUC      CUENTA                CBU                SALDO ANTERIOR         SALDO ACTUAL'],
+                                 [' CUENTA CORRIENTE $    MCTRO  1001-12345-0    15000541 00010011234500             543.21               321.56'],
+                                 [' CAJA DE AHORRO u$s    MCTRO  100-2-23456-1   15000541 00010022345614           3,072.33             1,489.98'],
+                                 [' CUENTA SUELDO $       MCTRO  100-3-34567-2   15000541 00010033456722          17,988.90            30,770.33']]
+        expected_accounts = self._get_accounts_expected()
+        pt = pdfParserTable('doc.pdf')
+        accounts = get_cuentas(pt)
+        for accountPosition, account in enumerate(accounts):
+            self.assertDictEqual(account, expected_accounts[accountPosition])
+
 
     @mock.patch('src.table_parse.fitz')
     @mock.patch('src.hsbc_parser.pdfParserTable.searchInAllPages')
@@ -195,6 +210,7 @@ class TableParserTest(unittest.TestCase):
                 else:
                     #print(res[nrolin]['pag_fin'])
                     self.assertIsNone(res[nrolin]['pag_fin'])
+
 
 
 if __name__ == '__main__':
