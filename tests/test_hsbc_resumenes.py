@@ -212,14 +212,20 @@ class TableParserTest(unittest.TestCase):
                     #print(res[nrolin]['pag_fin'])
                     self.assertIsNone(res[nrolin]['pag_fin'])
 
+    def _get_cat_and_tag_asserts(self, searchValues):
+        '''iterates for all the values performing the get_cat_and_tag function and the corresponding assert'''
+        for item in searchValues:
+            transData = [datetime.date(2019, 11, 4), item[0],'02468', 200.0, 0.0, 2872.33]
+            res = get_cat_and_tag(transData)
+            self.assertTupleEqual(res, item[1])
+
     # test_get_cat_and_tag
     def test_get_cat_and_tag(self):
         ''' Test '''
-        items = [(key, val) for key, val in tagsRegexps.items() if key ]
-        for item in items:
-            transData = [datetime.date(2019, 11, 4), 'sarasa{}xxaaxx'.format(item[0]),'02468', 200.0, 0.0, 2872.33]
-            res = get_cat_and_tag(transData)
-            self.assertTupleEqual(res, item[1])
+        items = [('sarasa{}xxaaxx'.format(key), val) for key, val in tagsRegexps.items() if key ]
+        self._get_cat_and_tag_asserts(items)
+        special_searches = [('', ('', '')), ('nonexistant', ('', ''))]
+        self._get_cat_and_tag_asserts(special_searches)
 
     # get_default_date
     # extract_hsbc_table
