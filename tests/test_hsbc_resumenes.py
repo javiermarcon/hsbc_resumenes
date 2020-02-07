@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 import unittest
 import mock
+import datetime
 from src.hsbc_parser import *
 from src.table_parse import pdfParserTable
 from src.categories_and_tags import tagsRegexps
@@ -228,6 +229,15 @@ class TableParserTest(unittest.TestCase):
         self._get_cat_and_tag_asserts(special_searches)
 
     # get_default_date
+    @mock.patch('src.table_parse.fitz')
+    @mock.patch('src.hsbc_parser.pdfParserTable.searchTextLine')
+    def test_get_default_date(self, mock_search_text_line, mock_fizz):
+    	# searchTextLine('EXTRACTO DEL', 0)[0][0].strip()
+    	mock_search_text_line.return_value = [['EXTRACTO DEL 23/07/2019', 0, 233]]
+    	expected_date = datetime.date(2019, 7, 23)
+    	pt = pdfParserTable('doc.pdf')
+    	res = get_default_date(pt)
+    	self.assertEqual(res, expected_date)
     # extract_hsbc_table
     # get_accounts_with_transactions
     # get_transactions
