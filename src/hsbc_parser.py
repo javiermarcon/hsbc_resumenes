@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
 from table_parse import pdfParserTable
+from categories_and_tags import tagsRegexps
 import struct
 import datetime
 import re
@@ -17,9 +18,10 @@ fin_tabla = {u'CUENTA CORRIENTE EN $ NRO': ['- RESUMEN DE ACUERDOS - (*)'],
                  u'CAJA DE AHORRO EN u$s NRO': ['- SALDO FINAL', '- DETALLE DE INTERESES -'],
                  u'CUENTA SUELDO EN $ NRO': ['- SALDO FINAL', '- DETALLE DE INTERESES -']}
 
-from categories_and_tags import tagsRegexps
-
 def get_cat_and_tag(trans):
+    '''Gets the corresponding category and tag from tagsRegexps
+    tagsRegexps = {'search_string': (u'tag', u'category'), ... }
+    '''
     res = [val for key, val in tagsRegexps.items() if key in trans[1] and key]
     if res:
         return res[0]

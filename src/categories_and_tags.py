@@ -1,4 +1,5 @@
-tagsRegexps = {'': (u'Antojos', u'Regalos'),
+tagsRegexps = { # search_string : ( tag, category )
+                '': (u'Antojos', u'Regalos'),
                 '': (u'Alquiler otro', u'Alquileres'),
                 '': (u'Beca', u'Becas'),
                 '': (u'Bono corp', u'Salario'),

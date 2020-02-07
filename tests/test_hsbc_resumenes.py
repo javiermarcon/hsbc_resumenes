@@ -4,6 +4,7 @@ import unittest
 import mock
 from src.hsbc_parser import *
 from src.table_parse import pdfParserTable
+from src.categories_and_tags import tagsRegexps
 
 class TableParserTest(unittest.TestCase):
 
@@ -211,6 +212,19 @@ class TableParserTest(unittest.TestCase):
                     #print(res[nrolin]['pag_fin'])
                     self.assertIsNone(res[nrolin]['pag_fin'])
 
+    # test_get_cat_and_tag
+    def test_get_cat_and_tag(self):
+        ''' Test '''
+        items = [(key, val) for key, val in tagsRegexps.items() if key ]
+        for item in items:
+            transData = [datetime.date(2019, 11, 4), 'sarasa{}xxaaxx'.format(item[0]),'02468', 200.0, 0.0, 2872.33]
+            res = get_cat_and_tag(transData)
+            self.assertTupleEqual(res, item[1])
+
+    # get_default_date
+    # extract_hsbc_table
+    # get_accounts_with_transactions
+    # get_transactions
 
 
 if __name__ == '__main__':
